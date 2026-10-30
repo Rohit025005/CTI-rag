@@ -1,0 +1,38 @@
+# CTI-RAG prototype configuration. Values here override the defaults in ctirag/config.py.
+# Environment overrides: OLLAMA_HOST, CTIRAG_LLM_PROVIDER, CTIRAG_MODEL, CTIRAG_EMBEDDER, NVIDIA_API_KEY.
+
+llm:
+  provider: ollama                          # ollama | nim (backup plan, hosted) | offline (no LLM)
+  model: qwen2.5:7b-instruct-q4_K_M         # main local model
+  alt_model: llama3.1:8b-instruct-q4_K_M    # alternate local model (--alt-model)
+  ollama_url: http://localhost:11434
+  temperature: 0.1
+  num_ctx: 8192
+  timeout_s: 300
+  nim_url: https://integrate.api.nvidia.com/v1
+  nim_model: meta/llama-3.1-8b-instruct
+  nim_api_key_env: NVIDIA_API_KEY
+
+embeddings:
+  provider: ollama                          # ollama | hash (offline fallback)
+  model: nomic-embed-text
+  ollama_url: http://localhost:11434
+
+kb:
+  stix_path: data/enterprise-attack.json    # downloaded by `build-kb --refresh`
+  techniques_path: data/attack_techniques.json
+  chroma_dir: data/chroma
+
+pipeline:
+  top_k: 5                  # k: ATT&CK entries retrieved per behaviour
+  max_retries: 3            # N: generate -> validate attempts per rule before fallback / manual review
+  template_fallback: true   # backup plan: template rule after N failed LLM attempts (flagged for review)
+  keyword_lookup: true      # hybrid retrieval: add fixed keyword-table hits as extra candidates
+  chunk_chars: 2500
+  max_behaviors: 12
+  max_rules: 10
+  max_techniques_per_behavior: 2
+  min_retrieval_score: 0.2  # offline mode only
+  make_yara: true
+
+output_dir: outputs

@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CTI-RAG · Multi-Agent RAG prototype</title>
+<style>
+  :root {
+    --bg: #0b1020; --card: #121a2f; --card2: #18223b; --line: #24304d; --teal: #2dd4bf; --teal-soft: #5eead4;
+    --coral: #fb7185; --green: #34d399; --amber: #fbbf24; --white: #f8fafc; --body: #cbd5e1; --muted: #94a3b8;
+    --dim: #7c8aa5; --hi: #0d2a2e; --code: #070b16;
+    --mono: ui-monospace, "Cascadia Code", Consolas, "JetBrains Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--body); font: 15px/1.5 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; }
+  a { color: var(--teal-soft); }
+  header.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between;
+               padding: 18px 28px; border-bottom: 1px solid var(--line); background: var(--bg); }
+  .brand { font-weight: 700; font-size: 20px; color: var(--white); display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .brand .logo { color: var(--teal); }
+  .brand .sub { font: 500 12px var(--mono); color: var(--teal); letter-spacing: .04em; }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill { font: 12px var(--mono); padding: 4px 10px; border-radius: 999px; background: var(--card2); border: 1px solid var(--line); color: var(--body); }
+  .pill .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--dim); }
+  .dot.ok { background: var(--green); } .dot.bad { background: var(--coral); } .dot.warn { background: var(--amber); }
+  main { max-width: 1240px; margin: 0 auto; padding: 24px 28px 60px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; margin-bottom: 18px; }
+  h2 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--teal); margin: 0 0 12px; font-family: var(--mono); font-weight: 600; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .row.end { justify-content: flex-end; margin-top: 12px; }
+  label { font-size: 13px; color: var(--muted); }
+  select, textarea { background: var(--code); color: var(--white); border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+  select { padding: 7px 10px; max-width: 360px; }
+  textarea { width: 100%; min-height: 220px; margin-top: 12px; padding: 12px 14px; font: 13px/1.5 var(--mono); resize: vertical; }
+  button, .btn { border: 1px solid var(--line); background: var(--card2); color: var(--white); padding: 8px 14px; border-radius: 8px;
+                 font: 600 14px inherit; cursor: pointer; text-decoration: none; display: inline-block; }
+  button.primary, .btn.primary { background: var(--teal); color: #04201c; border-color: var(--teal); }
+  button:disabled { opacity: .5; cursor: progress; }
+  .file input { display: none; }
+  .file { border: 1px dashed var(--line); padding: 7px 12px; border-radius: 8px; cursor: pointer; color: var(--body); }
+  .toggle { display: flex; gap: 6px; align-items: center; color: var(--body); cursor: pointer; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .note { font-size: 13px; color: var(--amber); margin-top: 8px; }
+  .agents { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
+  .agent { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--card2); transition: .2s; }
+  .agent b { display: block; color: var(--white); font-size: 14px; }
+  .agent span { font-size: 12px; color: var(--muted); }
+  .agent.active { border-color: var(--teal); background: var(--hi); box-shadow: 0 0 0 1px var(--teal) inset; }
+  .agent.done { border-color: var(--green); }
+  .agent.done b::after { content: " ✓"; color: var(--green); }
+  pre.log { margin: 0; max-height: 210px; overflow: auto; background: var(--code); border: 1px solid var(--line); border-radius: 8px;
+            padding: 10px 12px; font: 12px/1.55 var(--mono); color: var(--body); white-space: pre-wrap; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .tile .v { font-size: 28px; font-weight: 700; color: var(--white); line-height: 1.1; }
+  .tile .k { font: 11px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 10px; border-bottom: 1px solid var(--line); font-size: 14px; }
+  th { font: 600 11px var(--mono); color: var(--teal); text-transform: uppercase; letter-spacing: .06em; }
+  td.id { font-family: var(--mono); color: var(--teal-soft); white-space: nowrap; }
+  .ev { color: var(--muted); font-size: 12.5px; font-style: italic; margin-top: 3px; }
+  .chip { display: inline-block; font: 12px var(--mono); padding: 3px 8px; border-radius: 6px; margin: 2px 4px 2px 0;
+          background: var(--hi); border: 1px solid #1f4d4a; color: var(--teal-soft); text-decoration: none; }
+  .chip.plain { background: var(--card2); border-color: var(--line); color: var(--body); }
+  .chip.bad { background: #2a1520; border-color: #5b2333; color: var(--coral); }
+  .rule { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
+  .rule-h { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 14px; background: var(--card2); }
+  .rule-h .t { color: var(--white); font-weight: 600; margin-right: auto; }
+  .badge { font: 700 11px var(--mono); padding: 3px 8px; border-radius: 999px; letter-spacing: .04em; }
+  .b-valid { background: rgba(52,211,153,.15); color: var(--green); }
+  .b-fallback { background: rgba(251,191,36,.15); color: var(--amber); }
+  .b-flagged { background: rgba(251,113,133,.15); color: var(--coral); }
+  .b-type { background: rgba(45,212,191,.12); color: var(--teal); }
+  .b-src { background: var(--card); color: var(--muted); border: 1px solid var(--line); }
+  pre.code { margin: 0; padding: 12px 14px; background: var(--code); font: 12.5px/1.5 var(--mono); color: #e2e8f0; overflow: auto; max-height: 340px; }
+  .splunk { padding: 8px 14px; font: 12px var(--mono); color: var(--amber); border-top: 1px solid var(--line); overflow-x: auto; white-space: pre; }
+  details { border-top: 1px solid var(--line); padding: 8px 14px; font-size: 13px; }
+  summary { cursor: pointer; color: var(--muted); }
+  .att { margin: 8px 0; }
+  .att .ok { color: var(--green); } .att .no { color: var(--coral); }
+  .att ul { margin: 4px 0 0 18px; padding: 0; color: var(--body); }
+  .rule-a { display: flex; gap: 8px; padding: 8px 14px; border-top: 1px solid var(--line); }
+  .rule-a button { font-size: 12px; padding: 5px 10px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .ioc-k { font: 600 11px var(--mono); color: var(--muted); text-transform: uppercase; margin: 8px 0 4px; }
+  .error { background: #2a1520; border: 1px solid #5b2333; color: #fecdd3; border-radius: 10px; padding: 12px 14px; margin-bottom: 18px; }
+  footer { text-align: center; font-size: 12px; color: var(--dim); padding: 24px; }
+  @media (max-width: 860px) { .agents { grid-template-columns: 1fr 1fr; } .grid2 { grid-template-columns: 1fr; } main, header.top { padding-left: 16px; padding-right: 16px; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span><span class="logo">◆</span> CTI-RAG</span><span class="sub">THREAT REPORT → ATT&amp;CK → VALIDATED SIGMA / YARA</span></div>
+  <div class="pills" id="pills"><span class="pill">loading status…</span></div>
+</header>
+
+<main>
+  <section class="card">
+    <h2>1 · Upload report</h2>
+    <div class="row">
+      <label for="sample">Sample</label>
+      <select id="sample"></select>
+      <button id="loadSample">Load sample</button>
+      <label class="file">Upload .txt / .md / .html / .pdf<input type="file" id="file" accept=".txt,.md,.html,.htm,.pdf"></label>
+      <span id="fileName" class="muted"></span>
+      <label class="toggle"><input type="checkbox" id="offline"> Offline mode (no LLM)</label>
+    </div>
+    <textarea id="text" placeholder="Paste a threat report here, load a sample, or upload a file…"></textarea>
+    <div id="statusNote" class="note" hidden></div>
+    <div class="row end"><button id="run" class="primary">Analyze report</button></div>
+  </section>
+
+  <section class="card" id="pipeline" hidden>
+    <h2>2 · Agents at work</h2>
+    <div class="agents">
+      <div class="agent" data-a="1"><b>Agent 1</b><span>IOC &amp; behaviour extraction</span></div>
+      <div class="agent" data-a="2"><b>Agent 2</b><span>ATT&amp;CK mapping (ChromaDB)</span></div>
+      <div class="agent" data-a="3"><b>Agent 3</b><span>Sigma / YARA synthesis</span></div>
+      <div class="agent" data-a="4"><b>Agent 4</b><span>Validation + retry loop</span></div>
+    </div>
+    <pre class="log" id="log"></pre>
+  </section>
+
+  <div id="error" class="error" hidden></div>
+
+  <section id="results" hidden>
+    <div class="tiles" id="tiles"></div>
+    <div class="card"><h2>3 · Behaviours → mapped ATT&amp;CK techniques</h2><table id="behaviours"></table></div>
+    <div class="card"><h2>4 · Generated rules (review before deployment)</h2><div id="rules"></div></div>
+    <div class="grid2">
+      <div class="card"><h2>Extracted IOCs</h2><div id="iocs"></div></div>
+      <div class="card"><h2>Manual review queue</h2><div id="review"></div></div>
+    </div>
+    <div class="row end"><a id="export" class="btn primary" href="#">5 · Export rules + report (.zip)</a></div>
+  </section>
+</main>
+<footer>ATT&amp;CK® content © The MITRE Corporation · BE Project prototype, SKNCOE 2026–27 · Generated rules must be reviewed by an analyst before deployment.</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let pollTimer = null, logCount = 0, sampleName = "", embedderName = "";
+
+async function loadStatus() {
+  try {
+    const s = await (await fetch("/api/status")).json();
+    const pills = [];
+    if (s.provider === "ollama") {
+      const h = s.llm_health || {};
+      const cls = !h.reachable ? "bad" : (h.model_present ? "ok" : "warn");
+      const label = !h.reachable ? "Ollama not reachable" : (h.model_present ? h.model : h.model + " (not pulled)");
+      pills.push(`<span class="pill"><span class="dot ${cls}"></span>LLM: ${esc(label)}</span>`);
+      if (!h.reachable || !h.model_present) {
+        $("offline").checked = true;
+        $("statusNote").hidden = false;
+        $("statusNote").textContent = !h.reachable
+          ? "Ollama is not running, so Offline mode is switched on (heuristics + templates). Start Ollama and reload to use the LLM agents."
+          : `Model ${h.model} is not pulled yet (run: ollama pull ${h.model}). Offline mode is switched on for now.`;
+      }
+    } else {
+      pills.push(`<span class="pill"><span class="dot ok"></span>LLM: ${esc(s.provider)}</span>`);
+    }
+    embedderName = s.embedder;
+    pills.push(`<span class="pill" id="embPill">Embeddings: ${esc(s.embedder)}</span>`);
+    pills.push(`<span class="pill">ATT&amp;CK v${esc(s.kb.attack_version || "?")} · ${esc(s.kb.techniques || 0)} techniques</span>`);
+    pills.push(`<span class="pill">k=${s.params.top_k} · N=${s.params.max_retries}</span>`);
+    $("pills").innerHTML = pills.join("");
+    updateEmbPill();
+  } catch (e) { $("pills").innerHTML = `<span class="pill"><span class="dot bad"></span>backend not reachable</span>`; }
+  try {
+    const samples = await (await fetch("/api/samples")).json();
+    $("sample").innerHTML = samples.map(s => `<option value="${esc(s.name)}">${esc(s.title)}</option>`).join("");
+  } catch (e) { /* no samples */ }
+}
+
+$("loadSample").onclick = async () => {
+  const name = $("sample").value; if (!name) return;
+  const d = await (await fetch("/api/samples/" + encodeURIComponent(name))).json();
+  $("text").value = d.text; $("file").value = ""; $("fileName").textContent = ""; sampleName = name.replace(/\.[^.]+$/, "");
+};
+$("text").oninput = () => { sampleName = ""; };
+function updateEmbPill() { const p = $("embPill"); if (p) p.textContent = "Embeddings: " + ($("offline").checked ? "hashed (offline)" : embedderName); }
+$("offline").onchange = updateEmbPill;
+$("file").onchange = () => { const f = $("file").files[0]; $("fileName").textContent = f ? "File: " + f.name : ""; };
+
+$("run").onclick = async () => {
+  const fd = new FormData();
+  fd.append("text", $("text").value);
+  fd.append("offline", $("offline").checked ? "true" : "false");
+  if (sampleName) fd.append("source", sampleName);
+  if ($("file").files[0]) fd.append("file", $("file").files[0]);
+  $("error").hidden = true; $("results").hidden = true; $("pipeline").hidden = false;
+  $("log").textContent = ""; logCount = 0; setAgent(0);
+  $("run").disabled = true; $("run").textContent = "Analyzing…";
+  const r = await fetch("/api/jobs", {method: "POST", body: fd});
+  const d = await r.json();
+  if (!r.ok) { showError(d.detail || "request failed"); return; }
+  poll(d.job_id);
+};
+
+function setAgent(n, finished) {
+  document.querySelectorAll(".agent").forEach(el => {
+    const a = +el.dataset.a;
+    el.classList.toggle("active", !finished && a === n);
+    el.classList.toggle("done", finished || a < n);
+  });
+}
+
+function poll(jobId) {
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(async () => {
+    const d = await (await fetch(`/api/jobs/${jobId}?since=${logCount}`)).json();
+    if (d.log.length) {
+      logCount = d.log_total;
+      $("log").textContent += d.log.join("\n") + "\n";
+      $("log").scrollTop = $("log").scrollHeight;
+      const last = d.log.slice().reverse().find(l => /\[Agent \d\]/.test(l));
+      if (last) setAgent(+last.match(/\[Agent (\d)\]/)[1]);
+    }
+    if (d.status === "done") { setAgent(4, true); render(d.result); resetButton(); }
+    else if (d.status === "error") { showError(d.error); }
+    else poll(jobId);
+  }, 700);
+}
+
+function resetButton() { $("run").disabled = false; $("run").textContent = "Analyze report"; }
+function showError(msg) { $("error").hidden = false; $("error").textContent = "Error: " + msg; resetButton(); }
+
+function render(s) {
+  const st = s.stats;
+  const tiles = [
+    [st.iocs, "IOCs (regex)"], [st.behaviors, "Behaviours"], [st.behaviors_mapped, "Mapped"],
+    [st.techniques.length, "ATT&CK techniques"], [`${st.rules_valid}/${st.rules_total}`, "Valid rules"],
+    [st.rules_fallback + st.rules_flagged, "For review"], [st.rejected_ids, "Rejected IDs"],
+    [s.timings_s.total + " s", s.mode === "llm" ? "Time (" + (s.llm_usage?.calls ?? 0) + " LLM calls)" : "Time (offline)"],
+  ];
+  $("tiles").innerHTML = tiles.map(([v, k]) => `<div class="tile"><div class="v">${esc(v)}</div><div class="k">${esc(k)}</div></div>`).join("");
+
+  $("behaviours").innerHTML = `<tr><th>ID</th><th>Behaviour (evidence from report)</th><th>ATT&amp;CK techniques</th></tr>` +
+    s.behaviors.map(b => {
+      const techs = (b.techniques || []).map(t =>
+        `<a class="chip" href="${esc(t.url)}" target="_blank" title="${esc(t.reason)}">${esc(t.id)} ${esc(t.name)} · ${t.confidence}</a>`).join("")
+        || `<span class="chip plain">unmapped</span>`;
+      const rej = (b.rejected_ids || []).map(r => `<span class="chip bad" title="not in the retrieved candidates / ATT&CK">rejected ${esc(r)}</span>`).join("");
+      return `<tr><td class="id">${esc(b.id)}</td><td>${esc(b.action)}<div class="ev">“${esc(b.evidence)}”</div></td><td>${techs}${rej}</td></tr>`;
+    }).join("");
+
+  $("rules").innerHTML = s.rules.map(r => {
+    const badge = {valid: "b-valid", fallback: "b-fallback", flagged: "b-flagged"}[r.status];
+    const label = {valid: "VALID ✓", fallback: "TEMPLATE FALLBACK", flagged: "FLAGGED"}[r.status];
+    const attempts = r.attempts.map(a => `<div class="att"><span class="${a.ok ? "ok" : "no"}">Attempt ${a.n} (${esc(a.source)}): ${a.ok ? "valid" : "invalid"}</span>` +
+      (a.errors.length ? `<ul>${a.errors.map(e => `<li>${esc(e)}</li>`).join("")}</ul>` : "") + `</div>`).join("");
+    const body = r.final_rule ? `<pre class="code">${esc(r.final_rule)}</pre>` : `<pre class="code">No valid rule. Flagged for manual review.</pre>`;
+    const splunk = r.converted ? `<div class="splunk">Splunk: ${esc(r.converted)}</div>` : "";
+    return `<div class="rule"><div class="rule-h"><span class="t">${esc(r.task_id)} · ${esc(r.technique_ids.join(", ") || "file IOCs")} · ${esc(r.technique_name || "")}</span>
+      <span class="badge b-type">${r.rule_type.toUpperCase()}</span>${r.source ? `<span class="badge b-src">${esc(r.source)}</span>` : ""}
+      <span class="badge ${badge}">${label}</span><span class="badge b-src">${r.attempts.length} attempt(s)</span></div>
+      ${body}${splunk}<details><summary>Validation history (Agent 4)</summary>${attempts}</details>
+      ${r.final_rule ? `<div class="rule-a"><button data-copy="${esc(r.task_id)}">Copy</button><button data-dl="${esc(r.task_id)}">Download</button></div>` : ""}</div>`;
+  }).join("") || `<p class="muted">No rule tasks (no behaviour could be mapped to ATT&amp;CK).</p>`;
+  document.querySelectorAll("[data-copy]").forEach(b => b.onclick = () => {
+    navigator.clipboard.writeText(s.rules.find(r => r.task_id === b.dataset.copy).final_rule); b.textContent = "Copied"; });
+  document.querySelectorAll("[data-dl]").forEach(b => b.onclick = () => {
+    const r = s.rules.find(x => x.task_id === b.dataset.dl);
+    const blob = new Blob([r.final_rule], {type: "text/plain"});
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `${r.task_id}_${(r.technique_ids.join("_") || "file_iocs")}.${r.rule_type === "yara" ? "yar" : "yml"}`; a.click(); });
+
+  const iocs = Object.entries(s.iocs).filter(([k, v]) => v.length);
+  $("iocs").innerHTML = iocs.map(([k, v]) => `<div class="ioc-k">${esc(k)} (${v.length})</div>` +
+    v.slice(0, 25).map(x => `<span class="chip plain">${esc(x)}</span>`).join("")).join("") || `<p class="muted">No IOCs found.</p>`;
+  $("review").innerHTML = s.review_queue.length
+    ? s.review_queue.map(q => `<p><span class="chip bad">${esc(q.task_id)}</span> ${esc(q.rule_type)} · ${esc(q.technique_ids.join(", ") || "file IOCs")}<br><span class="muted">${esc(q.reason)}</span></p>`).join("")
+    : `<p class="muted">Nothing to review: every rule passed validation.</p>`;
+  $("export").href = `/api/runs/${encodeURIComponent(s.run_id)}/export`;
+  $("results").hidden = false;
+  $("results").scrollIntoView({behavior: "smooth"});
+}
+loadStatus();
+</script>
+</body>
+</html>

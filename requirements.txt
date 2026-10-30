@@ -1,0 +1,16 @@
+# Tested with Python 3.11 and: chromadb 1.5.9, pySigma 1.5.1, pySigma-backend-splunk 2.1.0,
+# yara-python 4.5.4, fastapi 0.162.0, uvicorn 0.54.0, pypdf 6.21.2
+chromadb>=1.0,<2
+pySigma>=1.0,<2
+pySigma-backend-splunk>=2.0,<3
+yara-python>=4.5,<5
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+pypdf>=4.0
+requests>=2.31
+PyYAML>=6.0
+numpy>=1.26
+# tests
+httpx>=0.27
+pytest>=8.0
